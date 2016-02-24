@@ -90,9 +90,9 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
         }
     }
     private var currentIndex : Int {
-        willSet(newValue) {
-            oldIndex = currentIndex
-        }
+//        willSet(newValue) {
+//            oldIndex = currentIndex
+//        }
         didSet {
             currentViewController = datasource?.viewControllerAtIndex(currentIndex, pageViewController: self)
             
@@ -194,8 +194,8 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
         tabsScrollView.backgroundColor = UIColor.clearColor()
         tabsScrollView.showsVerticalScrollIndicator = false
         tabsScrollView.showsHorizontalScrollIndicator = false
-        tabsScrollView.pagingEnabled = true
-        tabsScrollView.bounces = true
+        tabsScrollView.pagingEnabled = false
+        tabsScrollView.bounces = false
         tabsScrollView.scrollsToTop = false
         tabsScrollView.canCancelContentTouches = false
         
@@ -735,6 +735,7 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
         } else if (destinatedViewController == leftViewController) {
             currentIndex--
         }
+        oldIndex = currentIndex
         layoutContentViews(animated)
         updateTabsScroll(currentIndex)
     }
