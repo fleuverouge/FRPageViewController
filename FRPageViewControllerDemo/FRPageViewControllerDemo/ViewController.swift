@@ -10,12 +10,11 @@ import UIKit
 enum SegmentType {
     case TitlesOnly
     case ImagesOnly
-    case TitlesWithBackground
     case CustomViews
 }
 
-class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageViewControllerDelegate {
-    var pages = [UIViewController]()
+class ViewController: UIViewController, FRPageViewControllerDelegate {
+    
     var segmentType = SegmentType.TitlesOnly
 
     override func viewDidLoad() {
@@ -25,7 +24,8 @@ class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageVi
     }
     
     func setupPages() {
-        let colors = [UIColor.redColor(), UIColor.blackColor(), UIColor.blueColor(), UIColor.orangeColor(), UIColor.purpleColor(), UIColor.brownColor()]
+        var pages = [UIViewController]()
+        let colors = [UIColor.redColor(), UIColor.grayColor(), UIColor.blueColor(), UIColor.orangeColor(), UIColor.purpleColor(), UIColor.brownColor()]
         let titles = ["Sling", "Ukhidcaster", "Egouver", "Zhoemouth", "Goln", "Clagend"]
         for i in 0...colors.count-1 {
             let vc = UIViewController()
@@ -37,11 +37,12 @@ class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageVi
             label.font = UIFont.systemFontOfSize(50)
             vc.view.addSubview(label)
             label.translatesAutoresizingMaskIntoConstraints = false
-            let margins = vc.view.layoutMarginsGuide
-            //            label.heightAnchor.constraintEqualToAnchor(margins.heightAnchor, multiplier: 0.5).active = true
-            //            label.widthAnchor.constraintEqualToAnchor(margins.widthAnchor, multiplier: 0.5).active = true
-            label.centerXAnchor.constraintEqualToAnchor(margins.centerXAnchor).active = true
-            label.centerYAnchor.constraintEqualToAnchor(margins.centerYAnchor).active = true
+//            let margins = vc.view.layoutMarginsGuide
+//            //            label.heightAnchor.constraintEqualToAnchor(margins.heightAnchor, multiplier: 0.5).active = true
+//            //            label.widthAnchor.constraintEqualToAnchor(margins.widthAnchor, multiplier: 0.5).active = true
+//            label.centerXAnchor.constraintEqualToAnchor(margins.centerXAnchor).active = true
+//            label.centerYAnchor.constraintEqualToAnchor(margins.centerYAnchor).active = true
+            label.fr_constraints([.CenterX, .CenterY])
             pages.append(vc)
         }
         
@@ -54,19 +55,11 @@ class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageVi
         var pageVC: FRPageViewController!
         switch segmentType {
         case .TitlesOnly:
-            pageVC = FRPageViewController(titles: titles)
-            pageVC.tabWidthOption = .ProportionalWidth
+            pageVC = FRPageViewController(viewControllers: pages, tabTitles: titles)
+            pageVC.tabWidthOption = .Proportional
             break
         case .ImagesOnly:
-            pageVC = FRPageViewController(images: images, minimumWidth: 60, displayedIndex: 1)
-            break
-        case .TitlesWithBackground:
-            pageVC = FRPageViewController(titles: titles, selectedTabBackgroundImages: [UIImage(named: "TabDark")!], unselectedTabBackgroundImages: [UIImage(named: "TabLight")!], displayedIndex: 0)
-            pageVC.tintColor = UIColor.whiteColor()
-            pageVC.subTintColor = UIColor(white: 1.0, alpha: 0.5)
-            pageVC.highlighterHeight = 0.0
-            pageVC.tabContentDividerColor = UIColor(red: 0.0941, green: 0.2745, blue: 0.2235, alpha: 1.0) /* #184639 */
-            pageVC.tabWidthOption = .ProportionalWidth
+            pageVC = FRPageViewController(viewControllers: pages, renderedTabImages: images, minTabWidth: 60, defaultIndex: 1)
             break
         case .CustomViews:
             var selectedViews = [UIView]()
@@ -76,22 +69,23 @@ class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageVi
                 selectedViews.append(customViewWithTitle(titles[i], image:  UIImage(named: "SegmentIcon\(i+1)")!.imageWithRenderingMode(.AlwaysTemplate), backgroundColor: backgroundColor, isSelected: true))
                 unselectedViews.append(customViewWithTitle(titles[i], image:  UIImage(named: "SegmentIcon\(i+1)")!.imageWithRenderingMode(.AlwaysTemplate), backgroundColor: backgroundColor, isSelected: false))
             }
-            pageVC = FRPageViewController(selectedTabViews: selectedViews, unselectedTabViews: unselectedViews, minimumWidth: 0.0)
+            pageVC = FRPageViewController(viewControllers: pages, selectedTabViews: selectedViews, unselectedTabViews: unselectedViews)
             pageVC.highlighterHeight = 0.0
-            pageVC.tabWidthOption = .ProportionalWidth
+            pageVC.tabWidthOption = .Proportional
             break
         }
-        pageVC.datasource = self
         pageVC.delegate = self
-        self .addChildViewController(pageVC)
+        self.addChildViewController(pageVC)
         self.view.addSubview(pageVC.view)
         pageVC.view.translatesAutoresizingMaskIntoConstraints = false
+        pageVC.tabsBackgroundColor = UIColor.blackColor()
         let views = ["page": pageVC.view]
         self.view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
         self.view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
         //        pageVC .didMoveToParentViewController(self)
         self.view.updateConstraintsIfNeeded()
         self.view.layoutIfNeeded()
+        pageVC.didMoveToParentViewController(self)
     }
 
     override func didReceiveMemoryWarning() {
@@ -130,25 +124,5 @@ class ViewController: UIViewController, FRPageViewControllerDataSource, FRPageVi
         return aview
     }
 
-    // MARK: - PageVC datasource & delegate
-    func viewControllerAtIndex(index: Int, pageViewController: FRPageViewController) -> UIViewController? {
-        
-        if (index < 0 || index > 5) {
-            return nil
-        }
-        return pages[index]
-    }
-    
-    func didMoveToPage(index: Int, pageViewController: FRPageViewController) {
-        if segmentType == .CustomViews {
-            pageViewController.tabContentDividerColor = pages[index].view.backgroundColor ?? UIColor.clearColor()
-        }
-    }
-    
-    func didMoveToViewController(viewController: UIViewController?, pageViewController: FRPageViewController) {
-        if segmentType == .CustomViews {
-            pageViewController.tabContentDividerColor = viewController?.view.backgroundColor ?? UIColor.clearColor()
-        }
-    }
 }
 

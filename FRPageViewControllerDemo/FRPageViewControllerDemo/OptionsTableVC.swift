@@ -32,7 +32,7 @@ class OptionsTableVC: UITableViewController {
     }
 
     override func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 4
+        return 3
     }
 
     /*
@@ -97,10 +97,6 @@ class OptionsTableVC: UITableViewController {
                     case "ImagesOnly":
                         vc.segmentType = .ImagesOnly
                         vc.title = "Title images only"
-                    break
-                    case "TitlesBackground":
-                        vc.segmentType = .TitlesWithBackground
-                        vc.title = "Textual titles with background images"
                     break
                     case "CustomViews":
                         vc.segmentType = .CustomViews

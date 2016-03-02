@@ -2,65 +2,217 @@
 //  FRPageViewController.swift
 //  FRPageViewControllerDemo
 //
-//  Created by Do Thi Hong Ha on 1/13/16.
+//  Created by Do Thi Hong Ha on 2/29/16.
 //  Copyright © 2016 Yotel. All rights reserved.
 //
 
 import UIKit
 
-enum FRDirection {
+enum FRPVCDirection {
     case Forward
     case Backward
 }
 
-enum FRSegementWidthOption {
-    case EqualWidth(minWidth: CGFloat)
-    case ProportionalWidth
+enum FRPVCTabsWidthOption {
+    case Equal
+    case Proportional
 }
 
 internal enum FRPVCContentScrollState {
     case None
-    case Scrolling(Bool)
+    case Scrolling(forward: Bool)
 }
 
 @objc protocol FRPageViewControllerDelegate: AnyObject {
-    optional func didMoveToPage(index: Int, pageViewController: FRPageViewController)
-    optional func didMoveToViewController(viewController: UIViewController?, pageViewController: FRPageViewController)
+    optional func fr_pageViewController(pageViewController: FRPageViewController, didMoveToPage pageIndex: Int)
+    optional func fr_pageViewController(pageViewController: FRPageViewController, didMoveToViewController viewController: UIViewController)
 }
 
-protocol FRPageViewControllerDataSource: AnyObject {
-    func viewControllerAtIndex(index: Int, pageViewController: FRPageViewController) -> UIViewController?
-}
-
-class FRPageViewController: UIViewController, UIScrollViewDelegate {
-    weak var datasource: FRPageViewControllerDataSource?
+class FRPageViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+    
     weak var delegate: FRPageViewControllerDelegate?
     
-    var tabWidthOption = FRSegementWidthOption.EqualWidth(minWidth: 0)
-    var tabFont = UIFont.boldSystemFontOfSize(15)
-    var highlighterHeight : CGFloat = 2.0
-    var tabsHeight : CGFloat = 42.0
-    var tintColor = UIColor.redColor() {
-        didSet {
-            highlighter?.backgroundColor = tintColor
+    internal private(set) var viewControllers: [UIViewController]!
+    private var _tabWidthOption = FRPVCTabsWidthOption.Equal
+    var tabWidthOption : FRPVCTabsWidthOption {
+        get {
+            return _tabWidthOption
+        }
+        set {
+            let oldValue = _tabWidthOption
+            _tabWidthOption = newValue
+            if (oldValue != newValue) {
+                reloadTabs(true)
+                reloadTabs(false)
+            }
         }
     }
-    var subTintColor = UIColor.grayColor()
-    var tabContentDividerColor = UIColor.redColor() {
-        didSet {
-            dividerView?.backgroundColor = tabContentDividerColor
-        }
-    }
-    var tabContentDividerHeight : CGFloat = 2.0
-    var selectedTabBackgroundColor = UIColor.clearColor()
-    var unselectedTabBackgroundColor = UIColor.clearColor()
     
-    private let tabsScrollView = UIScrollView()
-    private let contentScrollView = UIScrollView()
+    private var _tabFont: UIFont?
+    var tabFont : UIFont {
+        get {
+            return _tabFont ?? UIFont.boldSystemFontOfSize(15)
+        }
+        set {
+            let oldValue = _tabFont
+            _tabFont = newValue
+            if (oldValue != newValue) {
+                reloadTabs(true)
+                reloadTabs(false)
+            }
+        }
+    }
+    
+    private var _highlighterHeight : CGFloat = 2.0 {
+        didSet {
+            adjustHighlighterPosition(currentIndex)
+            tabsCollectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: _highlighterHeight, right: 0)
+        }
+    }
+    
+    var highlighterHeight : CGFloat {
+        get {
+            return _highlighterHeight
+        }
+        set {
+            _highlighterHeight = max(0, newValue)
+        }
+    }
+    var highlighterColor: UIColor = UIColor.whiteColor() {
+        didSet {
+            if (highlighter != nil) {
+                highlighter.backgroundColor = highlighterColor
+            }
+        }
+    }
+    private var _tabsHeight : CGFloat = 42.0 {
+        didSet {
+            if (tabsHeightConstraint != nil) {
+                tabsHeightConstraint.constant = _tabsHeight + _highlighterHeight
+            }
+        }
+    }
+    private var tabsHeightConstraint: NSLayoutConstraint!
+    var tabsHeight : CGFloat {
+        get {
+            return _tabsHeight
+        }
+        set {
+            _tabsHeight = max(0, newValue)
+        }
+    }
+    
+    private var _tabTintColor = UIColor.whiteColor()
+    var tabTintColor : UIColor {
+        get {
+            return _tabTintColor
+        }
+        set {
+            let oldValue = _tabTintColor
+            _tabTintColor = newValue
+            if (oldValue != newValue) {
+                reloadTabs(true)
+            }
+        }
+    }
+    
+    private var _tabSubTintColor = UIColor.grayColor()
+    var tabSubTintColor: UIColor  {
+        get {
+            return _tabSubTintColor
+        }
+        set {
+            let oldValue = _tabSubTintColor
+            _tabSubTintColor = newValue
+            if (oldValue != newValue) {
+                reloadTabs(false)
+            }
+        }
+    }
+    var tabContentDividerColor = UIColor.whiteColor() {
+        didSet {
+            dividerView.backgroundColor = tabContentDividerColor
+        }
+    }
+    private var dividerHeightConstraint: NSLayoutConstraint!
+    private var _tabContentDividerHeight : CGFloat = 2.0 {
+        didSet {
+            if (dividerHeightConstraint != nil) {
+                dividerHeightConstraint.constant = tabContentDividerHeight
+            }
+        }
+    }
+    var tabContentDividerHeight : CGFloat {
+        get {
+            return _tabContentDividerHeight
+        }
+        set {
+            _tabContentDividerHeight = max(newValue, 0)
+        }
+    }
+    private var _selectedTabBackgroundColor = UIColor.clearColor()
+    var selectedTabBackgroundColor : UIColor {
+        get {
+            return _selectedTabBackgroundColor
+        }
+        set {
+            let oldValue = _selectedTabBackgroundColor
+            _selectedTabBackgroundColor = newValue
+            if (oldValue != newValue) {
+                reloadTabs(true)
+            }
+        }
+    
+    }
+    
+    private var _unselectedTabBackgroundColor = UIColor.clearColor()
+    var unselectedTabBackgroundColor : UIColor {
+        get {
+            return _unselectedTabBackgroundColor
+        }
+        set {
+            let oldValue = _unselectedTabBackgroundColor
+            _unselectedTabBackgroundColor = newValue
+            if (oldValue != newValue) {
+                reloadTabs(false)
+            }
+        }
+        
+    }
+    
+    private let tabsCollectionView : UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .Horizontal
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        let cv = UICollectionView(frame: CGRectZero, collectionViewLayout: layout)
+        cv.bounces = false
+        cv.showsHorizontalScrollIndicator = false
+        cv.showsVerticalScrollIndicator = false
+        cv.allowsMultipleSelection = false
+        return cv
+    }()
+    var tabsBackgroundColor = UIColor.clearColor() {
+        didSet {
+            tabsCollectionView.backgroundColor = tabsBackgroundColor
+        }
+    }
+    
+    private let contentScrollView : UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.tag = FRPageViewController.FRPVC_CONTENT_SCROLL_TAG
+        scrollView.backgroundColor = UIColor.clearColor()
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.pagingEnabled = true
+        scrollView.bounces = true
+        scrollView.scrollsToTop = false
+        return scrollView
+    }()
+    
     private let leftViewContainer = UIView()
     private let middleViewContainer = UIView()
     private let rightViewContainer = UIView()
-    private var tabButtons = [UIButton]()
     private var currentViewController: UIViewController? {
         willSet(newVC) {
             if let newVC = newVC where newVC != currentViewController {
@@ -85,47 +237,42 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
                     middleViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
                     middleViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
                 }
+                delegate?.fr_pageViewController?(self, didMoveToViewController: vc)
             }
-            delegate?.didMoveToViewController?(currentViewController, pageViewController: self)
         }
     }
-    private var currentIndex : Int {
-//        willSet(newValue) {
-//            oldIndex = currentIndex
-//        }
+    private var currentIndex : Int = 0 {
+        //        willSet(newValue) {
+        //            oldIndex = currentIndex
+        //        }
         didSet {
-            currentViewController = datasource?.viewControllerAtIndex(currentIndex, pageViewController: self)
+            currentViewController = viewControllers[currentIndex]
             
             if currentIndex > 0 {
-                leftViewController = datasource?.viewControllerAtIndex(currentIndex - 1, pageViewController: self)
+                leftViewController = viewControllers[currentIndex - 1]
             }
             else {
                 leftViewController = nil
             }
             
             if currentIndex < numberOfPages - 1{
-                rightViewController = datasource?.viewControllerAtIndex(currentIndex + 1, pageViewController: self)
+                rightViewController = viewControllers[currentIndex + 1]
             }
             else {
                 rightViewController = nil
             }
             
-            delegate?.didMoveToPage?(currentIndex, pageViewController: self)
+            delegate?.fr_pageViewController?(self, didMoveToPage: currentIndex)
         }
     }
-    private var oldIndex = 0
     private var numberOfPages = 0
     
-    private static let FRPVC_BUTTON_TAG = 101
     private static let FRPVC_TABS_SCROLL_TAG = 201
     private static let FRPVC_CONTENT_SCROLL_TAG = 202
-    private static let FRPVC_SELECTED_TAB_VIEW_TAG = 301
-    private static let FRPVC_UNSELECTED_TAB_VIEW_TAG = 302
     
-    private var highlighterContraints: [NSLayoutConstraint]?
-    private var highlighter: UIView?
+    private var highlighter : UIView!
     
-    private var dividerView: UIView?
+    private var dividerView = UIView()
     
     private var leftViewController: UIViewController? {
         willSet(newVC) {
@@ -181,267 +328,113 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
             }
         }
     }
-    
-    // MARK: - Initialization
-    
-    private init(currentIndex: Int = 0) {
-
-        self.currentIndex = currentIndex
+    private init() {
         super.init(nibName: nil, bundle: nil)
-        
-        tabsScrollView.delegate = self
-        tabsScrollView.tag = FRPageViewController.FRPVC_TABS_SCROLL_TAG
-        tabsScrollView.backgroundColor = UIColor.clearColor()
-        tabsScrollView.showsVerticalScrollIndicator = false
-        tabsScrollView.showsHorizontalScrollIndicator = false
-        tabsScrollView.pagingEnabled = false
-        tabsScrollView.bounces = false
-        tabsScrollView.scrollsToTop = false
-        tabsScrollView.canCancelContentTouches = false
-        
+    }
+    
+    private convenience init(viewControllers: [UIViewController], defaultIndex: Int) {
+        assert(viewControllers.count != 0, "Empty view controllers array")
+        self.init()
+        self.viewControllers = viewControllers
+        numberOfPages = viewControllers.count
+        currentIndex = defaultIndex
         contentScrollView.delegate = self
-        contentScrollView.tag = FRPageViewController.FRPVC_CONTENT_SCROLL_TAG
-        contentScrollView.backgroundColor = UIColor.clearColor()
-        contentScrollView.showsVerticalScrollIndicator = false
-        contentScrollView.showsHorizontalScrollIndicator = false
-        contentScrollView.pagingEnabled = true
-        contentScrollView.bounces = true
-        contentScrollView.scrollsToTop = false
     }
     
-    private var selectedTabBackgroundImages : [UIImage]?
-    private var unselectedTabBackgroundImages: [UIImage]?
+    private var tabTitles: [String]?
     
-    convenience init(titles: [String], selectedTabBackgroundImages: [UIImage]? = nil, unselectedTabBackgroundImages: [UIImage]? = nil, displayedIndex: Int = 0) {
+    convenience init(viewControllers: [UIViewController], tabTitles: [String], defaultIndex: Int = 0) {
+        assert(viewControllers.count == tabTitles.count, "Number of view controllers is not equal to that of titles")
+        self.init(viewControllers: viewControllers, defaultIndex: defaultIndex)
+        self.tabTitles = tabTitles
+    }
+    
+    
+    private var selectedTabViews: [UIView]?
+    private var unselectedTabViews: [UIView]?
+    
+    convenience init(viewControllers: [UIViewController], selectedTabViews: [UIView], unselectedTabViews:[UIView], defaultIndex: Int = 0) {
+        assert(viewControllers.count == selectedTabViews.count && viewControllers.count == unselectedTabViews.count, "Number of view controllers is not equal to that of tab views")
+        self.init(viewControllers: viewControllers, defaultIndex: defaultIndex)
+        self.selectedTabViews = selectedTabViews
+        self.unselectedTabViews = unselectedTabViews
+    }
+    
+    private var selectedTabImages: [UIImage]?
+    private var unselectedTabImages: [UIImage]?
+    var minTabWidth: CGFloat = 40 {
+        didSet {
+            calculateTabWidths()
+        }
+    }
 
-        self.init(currentIndex: displayedIndex)
-        
-        var selectedTabViews = [UIImageView]()
-        var unselectedTabViews = [UIImageView]()
-        
-        for i in 0...titles.count - 1 {
-            let button = UIButton(type: .Custom)
-            button.setTitle(titles[i], forState: .Normal)
-            button.titleLabel!.textAlignment = .Center
-            tabButtons.append(button)
-            
-            if let imgs = selectedTabBackgroundImages {
-                let image = imgs[i % imgs.count]
-                let imageView = UIImageView(image: image)
-                imageView.contentMode = .ScaleAspectFill
-                selectedTabViews.append(imageView)
-            }
-            
-            if let imgs = unselectedTabBackgroundImages {
-                let image = imgs[i % imgs.count]
-                let imageView = UIImageView(image: image)
-                imageView.contentMode = .ScaleAspectFill
-                unselectedTabViews.append(imageView)
-            }
-        }
-        
-        addTabViews(selectedTabViews, selected: true)
-        addTabViews(unselectedTabViews, selected: false)
-        
-        didIntializeController()
+    
+    convenience init(viewControllers: [UIViewController], selectedTabImages: [UIImage], unselectedTabImages: [UIImage], minTabWidth: CGFloat, defaultIndex: Int = 0) {
+        assert(viewControllers.count == selectedTabImages.count && viewControllers.count == unselectedTabImages.count, "Number of view controllers is not equal to that of tab images")
+        self.init(viewControllers: viewControllers, defaultIndex: defaultIndex)
+        self.selectedTabImages = selectedTabImages
+        self.unselectedTabImages = unselectedTabImages
+        self.minTabWidth = minTabWidth
     }
     
-    convenience init(images:[UIImage], unselectedImages: [UIImage]? = nil, minimumWidth: CGFloat, displayedIndex: Int = 0) {
-        self.init(currentIndex: displayedIndex)
-        
-        tabWidthOption = .EqualWidth(minWidth: minimumWidth)
-        
-        if let imgs = unselectedImages {
-            var selectedTabViews = [UIImageView]()
-            for image in images {
-                let imageView = UIImageView(image: image)
-                imageView.contentMode = .ScaleAspectFit
-                selectedTabViews.append(imageView)
-            }
-            addTabViews(selectedTabViews, selected: true, minimumWidth: minimumWidth)
-            
-            var unselectedTabViews = [UIImageView]()
-            for image in imgs {
-                let imageView = UIImageView(image: image)
-                imageView.contentMode = .ScaleAspectFit
-                unselectedTabViews.append(imageView)
-            }
-            addTabViews(unselectedTabViews, selected: false, minimumWidth: minimumWidth)
-        }
-        
-        else {
-            for image in images {
-                let button = UIButton(type: .Custom)
-                button.setImage(image, forState: .Normal)
-                button.imageView?.contentMode = .ScaleAspectFit
-                tabButtons.append(button)
-            }
-        }
-        
-        didIntializeController()
-    }
-    
-    convenience init(selectedTabViews: [UIView], unselectedTabViews: [UIView], minimumWidth: CGFloat, displayedIndex: Int = 0) {
-        assert(selectedTabViews.count == unselectedTabViews.count, "Unbalanced selected views and unselected views")
-        
-        self.init(currentIndex: displayedIndex)
-        
-        tabWidthOption = .EqualWidth(minWidth: minimumWidth)
-        addTabViews(selectedTabViews, selected: true, minimumWidth: minimumWidth)
-        addTabViews(unselectedTabViews, selected: false, minimumWidth: minimumWidth)
-        
-        didIntializeController()
-    }
-    
-    func didIntializeController() {
-        numberOfPages = tabButtons.count
-        assert(numberOfPages != 0, "Invalid number of pages")
-        assert(currentIndex >= 0 && currentIndex < numberOfPages, "Starting index out of range")
+    convenience init(viewControllers: [UIViewController], renderedTabImages: [UIImage], minTabWidth: CGFloat, defaultIndex: Int = 0) {
+        assert(viewControllers.count == renderedTabImages.count, "Number of view controllers is not equal to that of tab images")
+        self.init(viewControllers: viewControllers, defaultIndex: defaultIndex)
+        selectedTabImages = renderedTabImages
+        self.minTabWidth = minTabWidth
     }
 
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
-    // MARK: - Life cycle
-    
+
+    private var tabWidths: [CGFloat] = [CGFloat]()
+    private var requiredTabWidths = [CGFloat]()
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
-        view.addSubview(tabsScrollView)
-        tabsScrollView.translatesAutoresizingMaskIntoConstraints = false
+         setupChildrenViews()
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        layoutContentViews(false)
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
+    }
+    
+    private func setupChildrenViews() {
+        view.addSubview(tabsCollectionView)
+        tabsCollectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(contentScrollView)
         contentScrollView.translatesAutoresizingMaskIntoConstraints = false
-        highlighterHeight = max(0, highlighterHeight)
-        tabContentDividerHeight = max(0, tabContentDividerHeight)
-        var views : [String: UIView] = ["tabsScroll" : tabsScrollView,
-            "contentScroll": contentScrollView]
-        var metrics = ["tabsHeight": tabsHeight + highlighterHeight + tabContentDividerHeight]
-        view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[tabsScroll]-0-|", options: [], metrics: metrics, views: views))
-        view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[tabsScroll(tabsHeight)]-0-[contentScroll]-0-|", options: [.AlignAllLeading, .AlignAllTrailing], metrics: metrics, views: views))
+        view.addSubview(dividerView)
+        dividerView.translatesAutoresizingMaskIntoConstraints = false
+        var views : [String: UIView] = ["tabsScroll" : tabsCollectionView,
+            "contentScroll": contentScrollView,
+            "divider": dividerView]
+        view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[tabsScroll]-0-[divider]-0-[contentScroll]-0-|", options: [.AlignAllLeading, .AlignAllTrailing], metrics: nil, views: views))
+        view.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[tabsScroll]-0-|", options: [], metrics: nil, views: views))
+        tabsHeightConstraint = NSLayoutConstraint(item: tabsCollectionView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1.0, constant: _tabsHeight + _highlighterHeight)
+        dividerHeightConstraint = NSLayoutConstraint(item: dividerView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1.0, constant: _tabContentDividerHeight)
+        view.addConstraints([tabsHeightConstraint, dividerHeightConstraint])
         
-        // *** Tabs
-        let tabsContainer = UIView()
-        tabsContainer.backgroundColor = UIColor.clearColor()
-        tabsScrollView.addSubview(tabsContainer)
-        tabsContainer.translatesAutoresizingMaskIntoConstraints = false
+        tabsCollectionView.registerClass(FRPVCTabIconCell.self, forCellWithReuseIdentifier: "IconCell")
+        tabsCollectionView.registerClass(FRVCTabRenderedIconCell.self, forCellWithReuseIdentifier: "RenderedIconCell")
+        tabsCollectionView.registerClass(FRPVCTabSubviewCell.self, forCellWithReuseIdentifier: "SubviewCell")
+        tabsCollectionView.registerClass(FRPVCTabTitleCell.self, forCellWithReuseIdentifier: "TitleCell")
+        tabsCollectionView.delegate = self
+        tabsCollectionView.dataSource = self
+        tabsCollectionView.backgroundColor = tabsBackgroundColor
         
-        views["container"] = tabsContainer
-        tabsScrollView.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[container(tabsScroll)]-0-|", options: [], metrics: nil, views: views))
+        tabsCollectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: _highlighterHeight, right: 0)
+        calculateTabWidths()
         
-        
-        var maxWidth: CGFloat = 0.0
-        var totalWidth: CGFloat = 0.0
-        let realTabHeight = tabsHeight * UIScreen.mainScreen().scale
-        var calculatedWidths = [CGFloat]()
-        for button in tabButtons {
-            var size = CGSizeZero
-            if let image = button.imageForState(.Normal) where image.size.height > realTabHeight,
-                let scaledImage = image.imageByResizeToHeight(realTabHeight) {
-                button.setImage(scaledImage, forState: .Normal)
-                size = scaledImage.size
-            }
-            else {
-                button.titleLabel?.font = tabFont
-                var backgroundToAddBack = [UIImageView]()
-                for subview in button.subviews {
-                    if let iv = subview as? UIImageView {
-                        if let image = iv.image where image.size.height > realTabHeight,
-                            let scaledImage = image.imageByResizeToHeight(realTabHeight) {
-                                iv.image = scaledImage
-                        }
-                        if let label = button.titleLabel,
-                            let _ = label.text { // It's a background image
-                               backgroundToAddBack.insert(iv, atIndex: 0)
-                               iv.removeFromSuperview() // Remove to calculate size more precisely
-                        }
-                    }
-                }
-                size = button.systemLayoutSizeFittingSize(UILayoutFittingCompressedSize)
-                for iv in backgroundToAddBack {
-                    addTabView(iv, toButton: button, selected: iv.tag == FRPageViewController.FRPVC_SELECTED_TAB_VIEW_TAG)
-                }
-            }
-            size.width += 8.0
-            maxWidth = max(maxWidth, size.width)
-            calculatedWidths.append(size.width)
-            totalWidth += size.width
-        }
-        switch tabWidthOption {
-        case .EqualWidth(let minWidth):
-            maxWidth = max(maxWidth, minWidth)
-            totalWidth = maxWidth * CGFloat(numberOfPages)
-            break
-        case .ProportionalWidth:
-            break
-        }
-        
-        
-        var leftButton: UIButton?
-        for i in 0...numberOfPages - 1 {
-            let button = tabButtons[i]
-            button.addTarget(self, action: "didTapOnTabButton:", forControlEvents: .TouchUpInside)
-            button.tag = FRPageViewController.FRPVC_BUTTON_TAG + i
-
-            updateTabButtonState(button)
-            tabsContainer.addSubview(button)
-            button.translatesAutoresizingMaskIntoConstraints = false
-            var ratio : CGFloat = 0
-            switch tabWidthOption {
-            case .EqualWidth(_):
-                ratio = 1 / CGFloat(numberOfPages)
-                break
-            case .ProportionalWidth:
-                ratio =  calculatedWidths[i] / totalWidth
-                break
-            }
-       
-            tabsContainer.addConstraint(NSLayoutConstraint(item: button, attribute: .Width, relatedBy: .Equal, toItem: tabsContainer, attribute: .Width, multiplier: ratio, constant: 0.0))
-            
-            if let lb = leftButton {
-                tabsContainer.addConstraint(NSLayoutConstraint(item: button, attribute: .Leading, relatedBy: .Equal, toItem: lb, attribute: .Trailing, multiplier: 1.0, constant: 0.0))
-            }
-            else {
-                tabsContainer.addConstraint(NSLayoutConstraint(item: button, attribute: .Leading, relatedBy: .Equal, toItem: tabsContainer, attribute: .Leading, multiplier: 1.0, constant: 0.0))
-            }
-            
-            tabsContainer.addConstraint(NSLayoutConstraint(item: button, attribute: .Top, relatedBy: .Equal, toItem: tabsContainer, attribute: .Top, multiplier: 1.0, constant: 0.0))
-            tabsContainer.addConstraint(NSLayoutConstraint(item: button, attribute: .Bottom, relatedBy: .Equal, toItem: tabsContainer, attribute: .Bottom, multiplier: 1.0, constant: -highlighterHeight-tabContentDividerHeight))
-            
-            leftButton = button
-        }
-        
-        metrics["tabWidth"] = totalWidth
-        tabsScrollView.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[container(tabWidth@751)]-0-|", options: [], metrics: metrics, views: views))
-        view.addConstraint(NSLayoutConstraint(item: tabsContainer, attribute: .Width, relatedBy: .GreaterThanOrEqual, toItem: view, attribute: .Width, multiplier: 1.0, constant: 0.0))
-        
-        if highlighterHeight > 0 {
-            highlighter = UIView()
-            highlighter!.backgroundColor = tintColor
-            tabsContainer.addSubview(highlighter!)
-            highlighter!.translatesAutoresizingMaskIntoConstraints = false
-            let metrics = ["height": highlighterHeight,
-                            "dividerHeight": tabContentDividerHeight]
-            let views = ["highlighter" : highlighter!]
-            tabsContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:[highlighter(height)]-dividerHeight-|", options: [], metrics: metrics, views: views))
-            let selectedButton = tabButtons[currentIndex]
-            let highlighterLeadingContraint = NSLayoutConstraint(item: highlighter!, attribute: .Leading, relatedBy: .Equal, toItem: selectedButton, attribute: .Leading, multiplier: 1.0, constant: 0.0)
-            let highlighterWidthContraint = NSLayoutConstraint(item: highlighter!, attribute: .Width, relatedBy: .Equal, toItem: selectedButton, attribute: .Width, multiplier: 1.0, constant: 0.0)
-            highlighterContraints = [highlighterWidthContraint, highlighterLeadingContraint]
-            tabsContainer.addConstraints(highlighterContraints!)
-        }
-        
-        if tabContentDividerHeight > 0 {
-            dividerView = UIView()
-            dividerView!.backgroundColor = tabContentDividerColor
-            tabsContainer.addSubview(dividerView!)
-            dividerView!.translatesAutoresizingMaskIntoConstraints = false
-            let metrics = ["dividerHeight": tabContentDividerHeight]
-            let views = ["divider" : dividerView!]
-            tabsContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:[divider(dividerHeight)]-0-|", options: [], metrics: metrics, views: views))
-            tabsContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[divider]-0-|", options: [], metrics: metrics, views: views))
-        }
         // *** Content
         let contentContainer = UIView()
         contentContainer.backgroundColor = UIColor.clearColor()
@@ -464,7 +457,7 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
         contentContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[view1(view2)]-0-[view2(view3)]-0-[view3]-0-|", options: [.AlignAllTop, .AlignAllBottom], metrics: nil, views: views))
         contentContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[view1]-0-|", options: [], metrics: nil, views: views))
         
-        currentViewController = datasource?.viewControllerAtIndex(currentIndex, pageViewController: self)
+        currentViewController = viewControllers[currentIndex]
         if let vc = currentViewController {
             addChildViewController(vc)
             middleViewContainer.addSubview(vc.view)
@@ -474,75 +467,53 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
             middleViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
         }
         
-        leftViewController = datasource?.viewControllerAtIndex(currentIndex-1, pageViewController: self)
-        if let vc = leftViewController {
-            addChildViewController(vc)
-            leftViewContainer.addSubview(vc.view)
-            vc.view.translatesAutoresizingMaskIntoConstraints = false
-            let views = ["page": vc.view]
-            leftViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
-            leftViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+        if currentIndex > 0 {
+            leftViewController = viewControllers[currentIndex - 1]
+            if let vc = leftViewController {
+                addChildViewController(vc)
+                leftViewContainer.addSubview(vc.view)
+                vc.view.translatesAutoresizingMaskIntoConstraints = false
+                let views = ["page": vc.view]
+                leftViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+                leftViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+            }
         }
         
-        rightViewController = datasource?.viewControllerAtIndex(currentIndex+1, pageViewController: self)
-        if let vc = rightViewController {
-            addChildViewController(vc)
-            rightViewContainer.addSubview(vc.view)
-            vc.view.translatesAutoresizingMaskIntoConstraints = false
-            let views = ["page": vc.view]
-            rightViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
-            rightViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+        if currentIndex < numberOfPages - 1 {
+            rightViewController = viewControllers[currentIndex + 1]
+            if let vc = rightViewController {
+                addChildViewController(vc)
+                rightViewContainer.addSubview(vc.view)
+                vc.view.translatesAutoresizingMaskIntoConstraints = false
+                let views = ["page": vc.view]
+                rightViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+                rightViewContainer.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[page]-0-|", options: [], metrics: nil, views: views))
+            }
         }
-        
         view.updateConstraintsIfNeeded()
         view.layoutIfNeeded()
-    }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
+        
+        view.addObserver(self, forKeyPath: "bounds", options: [.New], context: nil)
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        layoutContentViews(false)
-    }
-    
-    // MARK: - Layout views
-    private func addTabViews(tabViews: [UIView], selected: Bool, minimumWidth: CGFloat = 0) {
-        if tabViews.count == 0 {
+    override func didMoveToParentViewController(parent: UIViewController?) {
+        super.didMoveToParentViewController(parent)
+        if let _ = tabsCollectionView.superview {
             return
         }
-        
-        for i in 0...tabViews.count - 1 {
-            let tview = tabViews[i]
-            tview.clipsToBounds = true
-            
-            var button: UIButton!
-            if (i < tabButtons.count) {
-                button = tabButtons[i]
-            }
-            else {
-                button = UIButton(type: .Custom)
-                tabButtons.append(button)
-            }
-            addTabView(tview, toButton: button, selected: selected, minimumWidth: minimumWidth)
-        }
+       
     }
     
-    private func addTabView(tview: UIView, toButton button: UIButton, selected: Bool, minimumWidth: CGFloat = 0) {
-        tview.tag = selected ? FRPageViewController.FRPVC_SELECTED_TAB_VIEW_TAG : FRPageViewController.FRPVC_UNSELECTED_TAB_VIEW_TAG
-        button.addSubview(tview)
-        tview.translatesAutoresizingMaskIntoConstraints = false
-        let views = ["view" : tview]
-        let metrics = ["minWidth" : minimumWidth]
-        button.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("H:|-0-[view(>=minWidth)]-0-|", options: [], metrics: metrics, views: views))
-        button.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|-0-[view]-0-|", options: [], metrics: metrics, views: views))
-        button.sendSubviewToBack(tview)
-        tview.userInteractionEnabled = false
-        tview.exclusiveTouch = false
+    /*
+    // MARK: - Navigation
 
+    // In a storyboard-based application, you will often want to do a little preparation before navigation
+    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
+        // Get the new view controller using segue.destinationViewController.
+        // Pass the selected object to the new view controller.
     }
+    */
+    
     private func layoutContentViews(animated: Bool) {
         let viewWidth = contentScrollView.bounds.width
         contentScrollView.setContentOffset(CGPoint(x: viewWidth, y: 0), animated: animated)
@@ -559,20 +530,112 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
         
         contentScrollView.contentInset = UIEdgeInsetsMake(0, leftInset, 0, rightInset)
     }
-    
-    private func updateTabButtonState(button: UIButton, selectedIndex: Int? = nil) {
-        let index = button.tag - FRPageViewController.FRPVC_BUTTON_TAG
-        let selected = index == (selectedIndex ?? currentIndex)
-        let color = selected ? tintColor : subTintColor
-        button.setTitleColor(color, forState: .Normal)
-        button.tintColor = color
-        button.backgroundColor = selected ? selectedTabBackgroundColor : unselectedTabBackgroundColor
-        button.viewWithTag(FRPageViewController.FRPVC_SELECTED_TAB_VIEW_TAG)?.alpha = selected ? 1.0 : 0.0
-        button.viewWithTag(FRPageViewController.FRPVC_UNSELECTED_TAB_VIEW_TAG)?.alpha = selected ? 0.0 : 1.0
+
+    func reloadTabs(selected: Bool) {
+        guard tabsCollectionView.dataSource != nil && currentIndex < numberOfPages && currentIndex >= 0 else {
+            return
+        }
+        if (selected) {
+            tabsCollectionView.reloadItemsAtIndexPaths([NSIndexPath(forRow: currentIndex, inSection: 0)])
+        }
+        else {
+            let idxPaths = (0...numberOfPages).filter({$0 != currentIndex}).map({NSIndexPath(forRow: $0, inSection: 0)})
+            tabsCollectionView.reloadItemsAtIndexPaths(idxPaths)
+        }
     }
     
-    // MARK: -
+    private func calculateTabWidths() {
+        calculateRequiredTabsWidth()
+        calculateFinalTabWidths()
+    }
     
+    private func calculateFinalTabWidths() {
+        let maxWidth = requiredTabWidths[numberOfPages]
+        var totalWidth = requiredTabWidths[numberOfPages + 1]
+        if tabWidthOption == .Equal {
+            totalWidth = maxWidth * CGFloat(numberOfPages)
+        }
+
+        let ratio = max(1, view.frame.size.width / totalWidth)
+        if (tabWidthOption == .Equal) {
+            tabWidths = [CGFloat](count: numberOfPages, repeatedValue: ceil(maxWidth * ratio))
+        }
+        else {
+            tabWidths = requiredTabWidths[0..<numberOfPages].map({ceil($0 * ratio)})
+        }
+        tabsCollectionView.reloadData()
+        tabsCollectionView.selectItemAtIndexPath(NSIndexPath(forRow: currentIndex, inSection: 0), animated: true, scrollPosition: .CenteredHorizontally)
+        adjustHighlighterPosition(currentIndex)
+    }
+    
+    private func calculateRequiredTabsWidth() {
+        requiredTabWidths.removeAll()
+        var maxWidth: CGFloat = 0
+        var totalWidth: CGFloat = 0
+        let cellFrame = CGRect(x: 0, y: 0, width: view.frame.size.width, height: _tabsHeight)
+        if let titles = tabTitles {
+            let sampleCell = FRPVCTabTitleCell(frame: cellFrame)
+            _tabFont = _tabFont ?? UIFont.boldSystemFontOfSize(15)
+            sampleCell.font = _tabFont!
+            sampleCell.minWidth = minTabWidth
+            for t in titles {
+                sampleCell.title = t
+                let width = sampleCell.requiredCellWidth()
+                maxWidth = max(width, maxWidth)
+                requiredTabWidths.append(width)
+                totalWidth += width
+            }
+        }
+        else if let _ = selectedTabImages {
+            let sampleCell = FRPVCTabIconCell(frame: cellFrame)
+            sampleCell.minWidth = minTabWidth
+            let width = sampleCell.requiredCellWidth()
+            maxWidth = width
+            requiredTabWidths.appendContentsOf([CGFloat](count: numberOfPages, repeatedValue: width))
+            totalWidth = width * CGFloat(numberOfPages)
+        }
+        else if let selectedTabViews = selectedTabViews,
+            unselectedTabViews = unselectedTabViews {
+                let sampleCell = FRPVCTabSubviewCell(frame: cellFrame)
+                sampleCell.minWidth = minTabWidth
+                for i in 0 ... numberOfPages - 1 {
+                    sampleCell.selectedSubview = selectedTabViews[i]
+                    sampleCell.unselectedSubview = unselectedTabViews[i]
+                    let width = sampleCell.requiredCellWidth()
+                    maxWidth = max(width, maxWidth)
+                    requiredTabWidths.append(width)
+                    totalWidth += width
+                }
+        }
+        requiredTabWidths.append(maxWidth)
+        requiredTabWidths.append(totalWidth)
+    }
+    
+    func adjustHighlighterPosition(newIndex: Int) {
+        guard numberOfPages > 0 && newIndex < numberOfPages && tabWidths.count == numberOfPages else {
+            return
+        }
+        var orgX : CGFloat = 0
+        var i = 0
+        while i < newIndex {
+            orgX += tabWidths[i]
+            i++
+        }
+        let highlighterFrame = CGRect(x: orgX, y: _tabsHeight, width: tabWidths[i], height: _highlighterHeight)
+        if (highlighter == nil) { // First time adjust
+            highlighter = UIView(frame: highlighterFrame)
+            highlighter.backgroundColor = highlighterColor
+            tabsCollectionView.addSubview(highlighter)
+        }
+        else {
+            UIView.animateWithDuration(0.2, animations: { () -> Void in
+                self.highlighter.frame = highlighterFrame
+            })
+        }
+    }
+    
+    //MARK: -
+//    private var isTabSelectedProgrammatically = false
     func moveToPageAtIndex(newIndex: Int) {
         assert(newIndex >= 0 && newIndex < numberOfPages, "Invalid page index")
         
@@ -580,72 +643,39 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
             return
         }
         
-        let forward = oldIndex < newIndex
+        let forward = currentIndex < newIndex
         
         if (forward) {
-            rightViewController = datasource?.viewControllerAtIndex(newIndex, pageViewController: self)
+            rightViewController = viewControllers[newIndex]
         }
         else {
-            leftViewController = datasource?.viewControllerAtIndex(newIndex, pageViewController: self)
+            leftViewController = viewControllers[newIndex]
         }
         
-        isTabButtonTapped = true
-        oldIndex = currentIndex
+        if let selectedIP = tabsCollectionView.indexPathsForSelectedItems()?.first
+            where selectedIP.row == newIndex { //ingnore it
+                
+        }
+        else {
+//            isTabSelectedProgrammatically = true
+            tabsCollectionView.selectItemAtIndexPath(NSIndexPath(forRow: newIndex, inSection: 0), animated: true, scrollPosition: .CenteredHorizontally)
+        }
+        isTabTapped = true
         scrollAnimated(true, forward: forward) {
             self.currentIndex = newIndex
             self.layoutContentViews(false)
+            self.isTabTapped = false
         }
-        updateTabsScroll(newIndex)
-    }
-    
-    private var isTabButtonTapped = false
-    func didTapOnTabButton(button: UIButton) {
-        let newIndex = button.tag - FRPageViewController.FRPVC_BUTTON_TAG
-        if currentIndex == newIndex {
-            return
-        }
-        
-        moveToPageAtIndex(newIndex)
+        adjustHighlighterPosition(newIndex)
     }
     
     // MARK: Transit views
-    
-    func updateTabsScroll(newIndex: Int) {
-        let selectedButton = tabButtons[newIndex]
-        updateTabButtonState(selectedButton, selectedIndex: newIndex)
-        let oldButton = tabButtons[oldIndex]
-        updateTabButtonState(oldButton, selectedIndex: newIndex)
-        
-        var tabFrame = selectedButton.frame
-        
-        if (oldIndex < newIndex && newIndex < self.numberOfPages - 1) {
-            tabFrame.size.width += 30;
-        }
-        else if (oldIndex > newIndex && newIndex > 0) {
-            tabFrame.origin.x -= 30;
-        }
-        tabsScrollView.scrollRectToVisible(tabFrame, animated: true)
-        if let hl = highlighter {
-            let highlighterLeadingContraint = NSLayoutConstraint(item: hl, attribute: .Leading, relatedBy: .Equal, toItem: selectedButton, attribute: .Leading, multiplier: 1.0, constant: 0.0)
-            let highlighterWidthContraint = NSLayoutConstraint(item: hl, attribute: .Width, relatedBy: .Equal, toItem: selectedButton, attribute: .Width, multiplier: 1.0, constant: 0.0)
-            let container = tabsScrollView.subviews[0]
-            UIView.animateWithDuration(0.2, animations: { () -> Void in
-                if let hlc = self.highlighterContraints {
-                    container.removeConstraints(hlc)
-                }
-                self.highlighterContraints = [highlighterWidthContraint, highlighterLeadingContraint]
-                container.addConstraints(self.highlighterContraints!)
-                container.layoutIfNeeded()
-            })
-        }
-        isTabButtonTapped = false
-    }
     
     func scrollAnimated(animated: Bool, forward: Bool, completion: ()->()) {
         if let _ = (forward ? rightViewController : leftViewController) {
             let xOffset = forward ? contentScrollView.bounds.width * 2 : 0
             if animated && scrollingState == FRPVCContentScrollState.None {
-                scrollingState = .Scrolling(forward)
+                scrollingState = .Scrolling(forward: forward)
                 UIView.animateWithDuration(0.2, animations: { () -> Void in
                     self.contentScrollView.setContentOffset(CGPoint(x: xOffset, y: 0), animated: false)
                     }, completion: { (finished) -> Void in
@@ -661,23 +691,80 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
             }
         }
     }
-    
 
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+    //MARK: Collection view data source
+    func numberOfSectionsInCollectionView(collectionView: UICollectionView) -> Int {
+        return 1
     }
-    */
+    
+    func collectionView(collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if (numberOfPages != tabWidths.count) {
+            return 0
+        }
+        return numberOfPages
+    }
+    
+    func collectionView(collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAtIndexPath indexPath: NSIndexPath) -> CGSize {
+        return CGSizeMake(tabWidths[indexPath.row], _tabsHeight)
+    }
+    
+    func collectionView(collectionView: UICollectionView, cellForItemAtIndexPath indexPath: NSIndexPath) -> UICollectionViewCell {
+        var output: FRPVCTabCell!
+        if let titles = tabTitles {
+            let cell = collectionView.dequeueReusableCellWithReuseIdentifier("TitleCell", forIndexPath: indexPath) as! FRPVCTabTitleCell
+            cell.title = titles[indexPath.row]
+            cell.font = tabFont
+            output = cell
+        }
+        else if let selectedTabImages = selectedTabImages {
+            if let unselectedTabImages = unselectedTabImages {
+                let cell = collectionView.dequeueReusableCellWithReuseIdentifier("IconCell", forIndexPath: indexPath) as! FRPVCTabIconCell
+                cell.highlightImage = selectedTabImages[indexPath.row]
+                cell.normalImage = unselectedTabImages[indexPath.row]
+                output = cell
+            }
+            else {
+                let cell = collectionView.dequeueReusableCellWithReuseIdentifier("RenderedIconCell", forIndexPath: indexPath) as! FRVCTabRenderedIconCell
+                cell.image = selectedTabImages[indexPath.row]
+                output = cell
+            }
+        }
+        else if let selectedTabViews = selectedTabViews,
+            unselectedTabViews = unselectedTabViews {
+                let cell = collectionView.dequeueReusableCellWithReuseIdentifier("SubviewCell", forIndexPath: indexPath) as! FRPVCTabSubviewCell
+                cell.selectedSubview = selectedTabViews[indexPath.row]
+                cell.unselectedSubview = unselectedTabViews[indexPath.row]
+                output = cell
+        }
+        output.highlightTintColor = _tabTintColor
+        output.normalTintColor = _tabSubTintColor
+        output.minWidth = minTabWidth
+        output.selected = indexPath.row == currentIndex
+
+        return output
+    }
+    
+    // MARK: - Collection view delegate
+    private var isTabTapped = false
+    func collectionView(collectionView: UICollectionView, didSelectItemAtIndexPath indexPath: NSIndexPath) {
+//        if (indexPath.row == currentIndex || isTabSelectedProgrammatically) {
+//            isTabSelectedProgrammatically = false
+//            return
+//        }
+        if (indexPath.row == currentIndex) {
+            return
+        }
+        tabsCollectionView.scrollToItemAtIndexPath(indexPath, atScrollPosition: .CenteredHorizontally, animated: true)
+        isTabTapped = true
+        moveToPageAtIndex(indexPath.row)
+    }
+    
     // MARK: - Scroll view delegate
- 
+    
     private var scrollingState = FRPVCContentScrollState.None
     
     func scrollViewDidScroll(scrollView: UIScrollView) {
-        if isTabButtonTapped {
+        if isTabTapped {
             return
         }
         if (scrollView.tag == FRPageViewController.FRPVC_CONTENT_SCROLL_TAG) {
@@ -686,36 +773,34 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
             if progress != 0 {
                 let forward = progress > 0
                 if let dest = (forward ? rightViewController : leftViewController) {
-                    scrollingState = FRPVCContentScrollState.Scrolling(forward)
-                    if (abs(progress) < 1) {
+                    scrollingState = FRPVCContentScrollState.Scrolling(forward: forward)
+                    let ap = abs(progress)
+                    if (ap < 1) {
                         let seeingIndex = forward ? currentIndex + 1 : currentIndex - 1
+                        let cell = tabsCollectionView.cellForItemAtIndexPath(NSIndexPath(forRow: seeingIndex, inSection: 0)) as! FRPVCTabCell
                         if (seeingIndex < numberOfPages && seeingIndex >= 0) {
-                            if let (tred, tgreen, tblue, talpha) = tintColor.colorComponents(),
-                                let (sred, sgreen, sblue, salpha) = subTintColor.colorComponents() {
-                                    let newAlpha = salpha + (talpha - salpha) * abs(progress)
-                                    let newRed = sred + (tred - sred) * abs(progress)
-                                    let newBlue = sblue + (tblue - sblue) * abs(progress)
-                                    let newGreen = sgreen + (tgreen - sgreen) * abs(progress)
+                            if let (tred, tgreen, tblue, talpha) = _tabTintColor.colorComponents(),
+                                let (sred, sgreen, sblue, salpha) = _tabSubTintColor.colorComponents() {
+                                    let newAlpha = salpha + (talpha - salpha) * ap
+                                    let newRed = sred + (tred - sred) * ap
+                                    let newBlue = sblue + (tblue - sblue) * ap
+                                    let newGreen = sgreen + (tgreen - sgreen) * ap
                                     let color = UIColor(red: newRed, green: newGreen, blue: newBlue, alpha: newAlpha)
-                                    tabButtons[seeingIndex].setTitleColor(color, forState: .Normal)
-                                    tabButtons[seeingIndex].tintColor = color
+                                    cell.normalTintColor = color
                             }
                             
                             if let (tred, tgreen, tblue, talpha) = selectedTabBackgroundColor.colorComponents(),
                                 let (sred, sgreen, sblue, salpha) = unselectedTabBackgroundColor.colorComponents() {
-                                    let newAlpha = salpha + (talpha - salpha) * abs(progress)
-                                    let newRed = sred + (tred - sred) * abs(progress)
-                                    let newBlue = sblue + (tblue - sblue) * abs(progress)
-                                    let newGreen = sgreen + (tgreen - sgreen) * abs(progress)
-                                    tabButtons[seeingIndex].backgroundColor = UIColor(red: newRed, green: newGreen, blue: newBlue, alpha: newAlpha)
+                                    let newAlpha = salpha + (talpha - salpha) * ap
+                                    let newRed = sred + (tred - sred) * ap
+                                    let newBlue = sblue + (tblue - sblue) * ap
+                                    let newGreen = sgreen + (tgreen - sgreen) * ap
+                                    cell.backgroundColor = UIColor(red: newRed, green: newGreen, blue: newBlue, alpha: newAlpha)
                             }
-                            
-                            tabButtons[seeingIndex].viewWithTag(FRPageViewController.FRPVC_SELECTED_TAB_VIEW_TAG)?.alpha = abs(progress)
                         }
                         
                     }
-                    
-                    if (abs(progress) >= 1) {
+                    else {
                         didScrollTo(dest, animated: false)
                     }
                 }
@@ -725,19 +810,38 @@ class FRPageViewController: UIViewController, UIScrollViewDelegate {
     
     
     private func didScrollTo(destinatedViewController: UIViewController?, animated: Bool) {
+        isTabTapped = false
         scrollingState = .None
+        
         if destinatedViewController == currentViewController {
-            updateTabsScroll(currentIndex)
             return
         }
-        else if (destinatedViewController == rightViewController) {
+        
+        if (destinatedViewController == rightViewController) {
             currentIndex++
         } else if (destinatedViewController == leftViewController) {
             currentIndex--
         }
-        oldIndex = currentIndex
+        let cell = tabsCollectionView.cellForItemAtIndexPath(NSIndexPath(forRow: currentIndex, inSection: 0)) as! FRPVCTabCell
+        cell.normalTintColor = _tabSubTintColor
         layoutContentViews(animated)
-        updateTabsScroll(currentIndex)
+//        isTabSelectedProgrammatically = true
+        tabsCollectionView.selectItemAtIndexPath(NSIndexPath(forRow: currentIndex, inSection: 0), animated: true, scrollPosition: .CenteredHorizontally)
+        adjustHighlighterPosition(currentIndex)
+    }
+    
+    // MARK: -
+    override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+        if let kp = keyPath where kp == "bounds" {
+                calculateFinalTabWidths()
+        }
+        else {
+            super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
+        }
+    }
+
+    deinit {
+        view.removeObserver(self, forKeyPath: "bounds")
     }
 }
 
