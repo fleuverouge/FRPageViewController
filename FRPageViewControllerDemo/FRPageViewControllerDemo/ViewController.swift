@@ -42,7 +42,8 @@ class ViewController: UIViewController, FRPageViewControllerDelegate {
 //            //            label.widthAnchor.constraintEqualToAnchor(margins.widthAnchor, multiplier: 0.5).active = true
 //            label.centerXAnchor.constraintEqualToAnchor(margins.centerXAnchor).active = true
 //            label.centerYAnchor.constraintEqualToAnchor(margins.centerYAnchor).active = true
-            label.fr_constraints([.CenterX, .CenterY])
+//            label.fr_constraints([.CenterX, .CenterY])
+            label.fr_layout().constraint(.CenterX).constraint(.CenterY)
             pages.append(vc)
         }
         

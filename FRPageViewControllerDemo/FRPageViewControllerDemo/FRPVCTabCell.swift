@@ -61,8 +61,7 @@ class FRPVCTabCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.addSubview(contentContainer)
-        contentContainer.translatesAutoresizingMaskIntoConstraints = false
-        contentContainer.fr_fillSuperView()
+        contentContainer.fr_layout().fillSuperView()
         backgroundColor = UIColor.clearColor()
         contentMinWidthConstraint = NSLayoutConstraint(item: contentContainer, attribute: .Width, relatedBy: .GreaterThanOrEqual, toItem: nil, attribute: .NotAnAttribute, multiplier: 1.0, constant: minWidth)
         contentView.addConstraint(contentMinWidthConstraint!)
@@ -82,22 +81,26 @@ class FRPVCTabCell: UICollectionViewCell {
 class FRVCTabRenderedIconCell: FRPVCTabCell {
     private let tabImageView = UIImageView()
     
-    private var imageYMarginConstraints = [NSLayoutConstraint]()
+    private var imageYMarginConstraints : [NSLayoutConstraint]?
     var imageYMargin: CGFloat = 8.0 {
         didSet {
-            for c in imageYMarginConstraints {
-                c.constant = imageYMargin
+            if let imageYMarginConstraints = imageYMarginConstraints {
+                for c in imageYMarginConstraints {
+                    c.constant = imageYMargin
+                }
             }
         }
     }
     
-    private var imageXMarginConstraints = [NSLayoutConstraint]()
+    private var imageXMarginConstraints : [NSLayoutConstraint]?
     var imageXMargin: CGFloat = 8.0 {
         didSet {
-            for c in imageXMarginConstraints {
-                c.constant = imageXMargin
+            if let imageXMarginConstraints = imageXMarginConstraints {
+                for c in imageXMarginConstraints {
+                    c.constant = imageXMargin
+                }
+                minWidth = max(minWidth, imageXMargin * 2)
             }
-            minWidth = max(minWidth, imageXMargin * 2)
         }
     }
     
@@ -158,10 +161,16 @@ class FRVCTabRenderedIconCell: FRPVCTabCell {
         super.init(frame: frame)
         contentContainer.addSubview(tabImageView)
         tabImageView.translatesAutoresizingMaskIntoConstraints = false
-        imageYMarginConstraints = tabImageView.fr_snap([FRALPosition.Top, FRALPosition.Bottom], padding: imageYMargin, toView: contentContainer)
-        imageXMarginConstraints = tabImageView.fr_snap([FRALPosition.Left, FRALPosition.Right], padding: imageXMargin, toView: contentContainer)
-        contentContainer.addConstraints(imageXMarginConstraints)
-        contentContainer.addConstraints(imageYMarginConstraints)
+//        imageYMarginConstraints = tabImageView.fr_snap([FRALPosition.Top, FRALPosition.Bottom], padding: imageYMargin, toView: contentContainer)
+//        imageXMarginConstraints = tabImageView.fr_snap([FRALPosition.Left, FRALPosition.Right], padding: imageXMargin, toView: contentContainer)
+//        contentContainer.addConstraints(imageXMarginConstraints)
+//        contentContainer.addConstraints(imageYMarginConstraints)
+        tabImageView.fr_layout().snap(.Top, padding: imageYMargin, constraintKey: "imageYMargin")
+                                .snap(.Bottom, padding: imageYMargin, constraintKey: "imageYMargin")
+                                .snap(.Left, padding: imageXMargin, constraintKey: "imageXMargin")
+                                .snap(.Right, padding: imageXMargin, constraintKey: "imageXMargin")
+        imageYMarginConstraints = tabImageView.fr_constraintsForKey("imageYMargin")
+        imageXMarginConstraints = tabImageView.fr_constraintsForKey("imageXMargin")
         tabImageView.contentMode = .ScaleAspectFit
         imageWHRatioConstraint = NSLayoutConstraint(item: tabImageView, attribute: .Width, relatedBy: .Equal, toItem: tabImageView, attribute: .Height, multiplier: currentRatio, constant: 0)
         imageWHRatioConstraint.priority = 999
@@ -215,20 +224,24 @@ class FRPVCTabIconCell: FRVCTabRenderedIconCell {
 class FRPVCTabTitleCell: FRPVCTabCell {
     private let tabTitleLabel = UILabel()
     
-    private var labelYMarginConstraints = [NSLayoutConstraint]()
+    private var labelYMarginConstraints : [NSLayoutConstraint]?
     var labelYMargin: CGFloat = 8.0 {
         didSet {
-            for c in labelYMarginConstraints {
-                c.constant = labelYMargin
+            if let labelYMarginConstraints = labelYMarginConstraints {
+                for c in labelYMarginConstraints {
+                    c.constant = labelYMargin
+                }
             }
         }
     }
     
-    private var labelXMarginConstraints = [NSLayoutConstraint]()
+    private var labelXMarginConstraints : [NSLayoutConstraint]?
     var labelXMargin: CGFloat = 8.0 {
         didSet {
-            for c in labelXMarginConstraints {
-                c.constant = labelXMargin
+            if let labelXMarginConstraints = labelXMarginConstraints {
+                for c in labelXMarginConstraints {
+                    c.constant = labelXMargin
+                }
             }
             minWidth = max(minWidth, labelXMargin * 2)
             tabTitleLabel.preferredMaxLayoutWidth = frame.size.width - labelXMargin * 2
@@ -286,11 +299,12 @@ class FRPVCTabTitleCell: FRPVCTabCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentContainer.addSubview(tabTitleLabel)
-        tabTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        labelYMarginConstraints = tabTitleLabel.fr_snap([FRALPosition.Top, FRALPosition.Bottom], padding: labelYMargin, toView: contentContainer)
-        labelXMarginConstraints = tabTitleLabel.fr_snap([FRALPosition.Left, FRALPosition.Right], padding: labelXMargin, toView: contentContainer)
-        contentContainer.addConstraints(labelXMarginConstraints)
-        contentContainer.addConstraints(labelYMarginConstraints)
+        tabTitleLabel.fr_layout().snap(.Top, padding: labelYMargin, constraintKey: "labelYMargin")
+            .snap(.Bottom, padding: labelYMargin, constraintKey: "labelYMargin")
+            .snap(.Left, padding: labelXMargin, constraintKey: "labelXMargin")
+            .snap(.Right, padding: labelXMargin, constraintKey: "labelXMargin")
+        labelYMarginConstraints = tabTitleLabel.fr_constraintsForKey("labelYMargin")
+        labelXMarginConstraints = tabTitleLabel.fr_constraintsForKey("labelXMargin")
         tabTitleLabel.preferredMaxLayoutWidth = frame.size.width - labelXMargin * 2
         tabTitleLabel.textAlignment = .Center
     }

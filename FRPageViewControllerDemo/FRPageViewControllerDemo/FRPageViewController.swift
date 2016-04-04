@@ -85,7 +85,7 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
             }
         }
     }
-    private var _tabsHeight : CGFloat = 42.0 {
+    private var _tabsHeight : CGFloat = 40.0 {
         didSet {
             if (tabsHeightConstraint != nil) {
                 tabsHeightConstraint.constant = _tabsHeight + _highlighterHeight
@@ -630,6 +630,17 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
         else {
             UIView.animateWithDuration(0.2, animations: { () -> Void in
                 self.highlighter.frame = highlighterFrame
+                }, completion: { (fished) -> Void in
+                    var newRect = highlighterFrame
+                    if (newIndex > 0) {
+                        newRect.origin.x -= 30
+                        newRect.size.width += 30
+                    }
+                    if (newIndex < self.numberOfPages - 1) {
+                        newRect.size.width += 30
+                    }
+                    newRect.origin.y = self.tabsHeight / 2
+                    self.tabsCollectionView.scrollRectToVisible(newRect, animated: true)
             })
         }
     }
@@ -754,7 +765,7 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
         if (indexPath.row == currentIndex) {
             return
         }
-        tabsCollectionView.scrollToItemAtIndexPath(indexPath, atScrollPosition: .CenteredHorizontally, animated: true)
+//        tabsCollectionView.scrollToItemAtIndexPath(indexPath, atScrollPosition: .CenteredHorizontally, animated: true)
         isTabTapped = true
         moveToPageAtIndex(indexPath.row)
     }
@@ -813,13 +824,13 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
         isTabTapped = false
         scrollingState = .None
         
-        if destinatedViewController == currentViewController {
+        if destinatedViewController === currentViewController {
             return
         }
         
-        if (destinatedViewController == rightViewController) {
+        if (destinatedViewController === rightViewController) {
             currentIndex++
-        } else if (destinatedViewController == leftViewController) {
+        } else if (destinatedViewController === leftViewController) {
             currentIndex--
         }
         let cell = tabsCollectionView.cellForItemAtIndexPath(NSIndexPath(forRow: currentIndex, inSection: 0)) as! FRPVCTabCell

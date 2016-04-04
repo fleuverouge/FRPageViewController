@@ -15,7 +15,7 @@
 		81498C711C45EBC5005F1D86 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81498C6F1C45EBC5005F1D86 /* Main.storyboard */; };
 		81498C731C45EBC5005F1D86 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81498C721C45EBC5005F1D86 /* Assets.xcassets */; };
 		81498C761C45EBC5005F1D86 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81498C741C45EBC5005F1D86 /* LaunchScreen.storyboard */; };
-		81DD8EF21C86A91500CBB5AC /* FRAutoLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DD8EED1C86A91500CBB5AC /* FRAutoLayout.swift */; };
+		81BBDC481C8946B80034FCD6 /* FRAutoLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BBDC471C8946B80034FCD6 /* FRAutoLayout.swift */; };
 		81DD8EF31C86A91500CBB5AC /* FRColorExt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DD8EEE1C86A91500CBB5AC /* FRColorExt.swift */; };
 		81DD8EF41C86A91500CBB5AC /* FROperators.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DD8EEF1C86A91500CBB5AC /* FROperators.swift */; };
 		81DD8EF51C86A91500CBB5AC /* FRScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DD8EF01C86A91500CBB5AC /* FRScreen.swift */; };
@@ -33,7 +33,7 @@
 		81498C721C45EBC5005F1D86 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		81498C751C45EBC5005F1D86 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		81498C771C45EBC5005F1D86 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		81DD8EED1C86A91500CBB5AC /* FRAutoLayout.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FRAutoLayout.swift; path = ../../../Misc/FRAutoLayout.swift; sourceTree = "<group>"; };
+		81BBDC471C8946B80034FCD6 /* FRAutoLayout.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FRAutoLayout.swift; path = ../../../FRAutoLayoutDemo/FRAutoLayoutDemo/FRAutoLayout.swift; sourceTree = "<group>"; };
 		81DD8EEE1C86A91500CBB5AC /* FRColorExt.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FRColorExt.swift; path = ../../../Misc/FRColorExt.swift; sourceTree = "<group>"; };
 		81DD8EEF1C86A91500CBB5AC /* FROperators.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FROperators.swift; path = ../../../Misc/FROperators.swift; sourceTree = "<group>"; };
 		81DD8EF01C86A91500CBB5AC /* FRScreen.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FRScreen.swift; path = ../../../Misc/FRScreen.swift; sourceTree = "<group>"; };
@@ -87,7 +87,7 @@
 		81DD8EEC1C86A8EC00CBB5AC /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
-				81DD8EED1C86A91500CBB5AC /* FRAutoLayout.swift */,
+				81BBDC471C8946B80034FCD6 /* FRAutoLayout.swift */,
 				81DD8EEE1C86A91500CBB5AC /* FRColorExt.swift */,
 				81DD8EEF1C86A91500CBB5AC /* FROperators.swift */,
 				81DD8EF01C86A91500CBB5AC /* FRScreen.swift */,
@@ -170,12 +170,12 @@
 				81498C6E1C45EBC5005F1D86 /* ViewController.swift in Sources */,
 				81178AB01C84546800123C9D /* FRPageViewController.swift in Sources */,
 				81DD8EF51C86A91500CBB5AC /* FRScreen.swift in Sources */,
-				81DD8EF21C86A91500CBB5AC /* FRAutoLayout.swift in Sources */,
 				81DD8EF41C86A91500CBB5AC /* FROperators.swift in Sources */,
 				81DD8EF31C86A91500CBB5AC /* FRColorExt.swift in Sources */,
 				813F39D61C4781F100002A2E /* OptionsTableVC.swift in Sources */,
 				81498C6C1C45EBC5005F1D86 /* AppDelegate.swift in Sources */,
 				81DD8EF61C86A91500CBB5AC /* FRView.swift in Sources */,
+				81BBDC481C8946B80034FCD6 /* FRAutoLayout.swift in Sources */,
 				81178AAC1C84437900123C9D /* FRPVCTabCell.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
