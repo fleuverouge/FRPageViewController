@@ -619,7 +619,7 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
         var i = 0
         while i < newIndex {
             orgX += tabWidths[i]
-            i++
+            i += 1
         }
         let highlighterFrame = CGRect(x: orgX, y: _tabsHeight, width: tabWidths[i], height: _highlighterHeight)
         if (highlighter == nil) { // First time adjust
@@ -829,9 +829,9 @@ class FRPageViewController: UIViewController, UICollectionViewDataSource, UIColl
         }
         
         if (destinatedViewController === rightViewController) {
-            currentIndex++
+            currentIndex += 1
         } else if (destinatedViewController === leftViewController) {
-            currentIndex--
+            currentIndex -= 1
         }
         let cell = tabsCollectionView.cellForItemAtIndexPath(NSIndexPath(forRow: currentIndex, inSection: 0)) as! FRPVCTabCell
         cell.normalTintColor = _tabSubTintColor
